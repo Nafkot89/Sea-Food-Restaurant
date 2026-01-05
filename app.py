@@ -1,3 +1,4 @@
+from tenacity import retry, stop_after_attempt, wait_exponential
 import os
 import json
 from datetime import datetime
@@ -31,6 +32,12 @@ RULES:
 OUTPUT: JSON array with objects: date, description, account, amount
 Example: [{"date": "05/01", "description": "Orig CO Name: Uber USA 6787", "account": "", "amount": "505.01"}]
 """
+
+# ========== RETRY HELPER ==========
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+def call_gemini_with_retry(model, contents):
+    """Calls the Gemini API with automatic retries on failure."""
+    return model.generate_content(contents)
 
 # ========== HTML PAGE ==========
 HTML_PAGE = """<!DOCTYPE html>
@@ -79,12 +86,13 @@ def upload_file():
         if file.filename == '': return jsonify({"success": False, "error": "No file selected"})
         
         # 3. Configure Gemini AI
-        genai.configure(api_key=GEMINI_API_KEY, transport='rest', client_options={'api_endpoint': 'https://generativelanguage.googleapis.com', 'timeout': 300})
+        transport_opts = {"rest": {"timeout": 300}}  # 300 seconds = 5 minutes
+        genai.configure(api_key=GEMINI_API_KEY, transport_options=transport_opts)
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # 4. Extract text from PDF
+        # 4. Extract text from PDF (WITH RETRY)
         pdf_bytes = file.read()
-        response = model.generate_content([ SYSTEM_PROMPT, {"mime_type": "application/pdf", "data": pdf_bytes} ])
+        response = call_gemini_with_retry(model, [ SYSTEM_PROMPT, {"mime_type": "application/pdf", "data": pdf_bytes} ])
         
         # 5. Parse JSON response
         json_text = response.text.strip()
@@ -114,7 +122,6 @@ def upload_file():
         return jsonify({"success": False, "error": f"Processing failed: {str(e)}"})
 
 if __name__ == '__main__':
-
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False)
 
 
