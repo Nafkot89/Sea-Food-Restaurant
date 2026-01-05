@@ -79,7 +79,7 @@ def upload_file():
         if file.filename == '': return jsonify({"success": False, "error": "No file selected"})
         
         # 3. Configure Gemini AI
-        genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY, transport='rest', client_options={'api_endpoint': 'https://generativelanguage.googleapis.com', 'timeout': 300})
         model = genai.GenerativeModel('gemini-2.5-flash')
         
         # 4. Extract text from PDF
@@ -116,4 +116,5 @@ def upload_file():
 if __name__ == '__main__':
 
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False)
+
 
