@@ -6,6 +6,7 @@ from flask import Flask, request, render_template_string, jsonify
 import google.generativeai as genai
 import gspread
 from google.oauth2 import service_account
+from google.api_core.client_options import ClientOptions  # New import
 
 app = Flask(__name__)
 
@@ -85,10 +86,12 @@ def upload_file():
         file = request.files['file']
         if file.filename == '': return jsonify({"success": False, "error": "No file selected"})
         
-        # 3. Configure Gemini AI
-        transport_opts = {"rest": {"timeout": 300}}  # 300 seconds = 5 minutes
-        genai.configure(api_key=GEMINI_API_KEY, transport_options=transport_opts)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # 3. Configure Gemini AI with a timeout
+        genai.configure(api_key=GEMINI_API_KEY)
+        # Create a ClientOptions object with a 5-minute (300s) timeout
+        client_options = ClientOptions(timeout=300)
+        # Initialize the model with the configured client options
+        model = genai.GenerativeModel('gemini-2.5-flash', client_options=client_options)
         
         # 4. Extract text from PDF (WITH RETRY)
         pdf_bytes = file.read()
@@ -123,5 +126,3 @@ def upload_file():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False)
-
-
